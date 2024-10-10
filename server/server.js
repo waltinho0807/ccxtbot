@@ -12,7 +12,7 @@ const corsOptions = {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DATABASE_URL = DATABASE_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
 
 app.use(cors(corsOptions));
 app.use(express.json()); // Adiciona o middleware para análise de JSON
