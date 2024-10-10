@@ -24,8 +24,8 @@ const runBot = async () => {
     }
 
     const exchange = new ccxt.binance({
-        apiKey: apiKeyData.apikey,
-        secret: apiKeyData.secret,
+        apiKey: process.env.APIKEY,
+        secret: process.env.SECRET,
     });
 
     const symbol = apiKeyData.symbol;
