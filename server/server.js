@@ -11,7 +11,7 @@ const corsOptions = {
 };
 
 const app = express();
-const PORT = PORT;
+const PORT = process.env.PORT || 5000;
 const DATABASE_URL = DATABASE_URL;
 
 app.use(cors(corsOptions));
@@ -76,6 +76,6 @@ app.get('/api/get-api-key', async (req, res) => {
 });
 
 // Iniciar o servidor
-app.listen(5000, () => {
+app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
