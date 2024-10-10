@@ -11,7 +11,7 @@ const corsOptions = {
 };
 
 const app = express();
-const PORT = PORT || 5000;
+const PORT = PORT;
 const DATABASE_URL = DATABASE_URL;
 
 app.use(cors(corsOptions));
