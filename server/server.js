@@ -76,6 +76,6 @@ app.get('/api/get-api-key', async (req, res) => {
 });
 
 // Iniciar o servidor
-app.listen(PORT, () => {
+app.listen(5000, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
