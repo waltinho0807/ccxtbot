@@ -38,6 +38,6 @@ const botStateSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('BotState', botStateSchema);
+const BotState = mongoose.model('BotState', botStateSchema);
 
-module.exports = { ApiKey, Order };
+module.exports = { ApiKey, Order, BotState };
