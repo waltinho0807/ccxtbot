@@ -1,7 +1,7 @@
 const ccxt = require('ccxt');
 const technicalIndicators = require('technicalindicators');
 const mongoose = require('mongoose');
-const { ApiKey, Order, BotState } = require('./models'); // Importar os modelos
+const { ApiKey, Order, BotState } = require('./models'); // Inclua BotState aqui
 require('dotenv').config();
 
 const DATABASE_URL = process.env.DATABASE_URL;

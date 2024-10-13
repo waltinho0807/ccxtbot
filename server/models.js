@@ -31,4 +31,13 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.model('Order', orderSchema);
 
+const botStateSchema = new mongoose.Schema({
+    lastBuyOrderId: {
+        type: String,
+        default: null
+    }
+});
+
+module.exports = mongoose.model('BotState', botStateSchema);
+
 module.exports = { ApiKey, Order };
