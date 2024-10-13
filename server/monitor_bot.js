@@ -9,19 +9,29 @@ let lastBuyOrderId = null;
 
 // Conexão com o banco de dados e recuperação do estado do bot
 async function connectDB() {
-    await mongoose.connect(DATABASE_URL);
-    console.log("Conectado ao banco");
-
-    // Recupera o estado do bot (última ordem de compra) ao iniciar
-    const botState = await BotState.findOne();
-    if (botState) {
-        lastBuyOrderId = botState.lastBuyOrderId;
-        console.log("Estado do bot recuperado:", lastBuyOrderId);
-    } else {
-        console.log("Nenhum estado do bot encontrado.");
+    try {
+        await mongoose.connect(DATABASE_URL);
+        console.log("Conectado ao banco");
+        
+        // Recuperar o estado do bot
+        let botState = await BotState.findOne();
+        
+        if (botState) {
+            lastBuyOrderId = botState.lastBuyOrderId;
+            console.log("Estado do bot recuperado:", lastBuyOrderId);
+        } else {
+            console.log("Nenhum estado do bot encontrado. Criando um novo registro.");
+            botState = new BotState({ lastBuyOrderId: null });
+            await botState.save();
+            console.log("Novo estado do bot criado.");
+        }
+        
+        runBot(); // Inicie o bot após a conexão
+    } catch (error) {
+        console.error('Erro ao conectar ao banco de dados:', error);
     }
-    runBot();
 }
+
 
 connectDB();
 
