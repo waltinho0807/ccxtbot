@@ -42,6 +42,11 @@ const runBot = async () => {
         return;
     }
 
+    if (!process.env.APIKEY || !process.env.SECRET) {
+        console.error('As credenciais da API não estão configuradas nas variáveis de ambiente.');
+        return;
+    }
+
     const exchange = new ccxt.binance({
         apiKey: process.env.APIKEY,
         secret: process.env.SECRET,
