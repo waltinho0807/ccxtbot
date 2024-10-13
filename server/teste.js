@@ -12,7 +12,7 @@ const apiKeySchema = new mongoose.Schema({
 const ApiKey = mongoose.model('ApiKey', apiKeySchema);
 
 // Conectar ao MongoDB
-mongoose.connect('mongodb+srv://calegari:luizamor4@cluster0.rz7m5.gcp.mongodb.net/cryptoBot?retryWrites=true&w=majority', {
+mongoose.connect('//mongodb+srv://calegari:luizamor4@cluster0.rz7m5.gcp.mongodb.net/cryptoBot?retryWrites=true&w=majority', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })

@@ -1,98 +1,83 @@
 const ccxt = require('ccxt');
 const technicalIndicators = require('technicalindicators');
 const mongoose = require('mongoose');
-const { ApiKey, Order } = require('./models'); // Importar os modelos do MongoDB
+const { ApiKey, Order, BotState } = require('./models'); // Importar os modelos
 require('dotenv').config();
-const DATABASE_URL = process.env.DATABASE_URL;
 
+const DATABASE_URL = process.env.DATABASE_URL;
+let lastBuyOrderId = null;
+
+// Conexão com o banco de dados e recuperação do estado do bot
 async function connectDB() {
-    mongoose.connect(DATABASE_URL).then(() => {
-        console.log("conectado com o banco");
-        runBot();
-    });
+    await mongoose.connect(DATABASE_URL);
+    console.log("Conectado ao banco");
+
+    // Recupera o estado do bot (última ordem de compra) ao iniciar
+    const botState = await BotState.findOne();
+    if (botState) {
+        lastBuyOrderId = botState.lastBuyOrderId;
+        console.log("Estado do bot recuperado:", lastBuyOrderId);
+    } else {
+        console.log("Nenhum estado do bot encontrado.");
+    }
+    runBot();
 }
 
 connectDB();
 
 const runBot = async () => {
-    const apiKeyData = await ApiKey.findOne(); // Buscar as credenciais da API
-    console.log('API Key Data:', apiKeyData);
-    
+    const apiKeyData = await ApiKey.findOne(); // Obtém credenciais da API
     if (!apiKeyData) {
         console.error('Credenciais da API não encontradas no banco de dados.');
         return;
     }
 
     const exchange = new ccxt.binance({
-        apiKey: process.env.APIKEY,
-        secret: process.env.SECRET,
+        apiKey: apiKeyData.apikey,
+        secret: apiKeyData.secret,
     });
 
     const symbol = apiKeyData.symbol;
     const timeframe = apiKeyData.timeframe;
     const usdtAmount = apiKeyData.usdtAmount;
-    const limit = 100; // número de candles para análise
-    let lastBuyOrderId = null; // Armazenar o ID da última ordem de compra
+    const limit = 100;
 
     try {
-        // Obter os dados de mercado
+        // Monitora a ordem de compra ativa, se houver
+        if (lastBuyOrderId) {
+            await checkOrderStatus(exchange, symbol);
+            return;
+        }
+
+        // Obtém dados de mercado e calcula indicadores
         const ohlcv = await exchange.fetchOHLCV(symbol, timeframe, undefined, limit);
-        const closePrices = ohlcv.map(candle => candle[4]); // preço de fechamento
+        const closePrices = ohlcv.map(candle => candle[4]);
 
-        // Calcular RSI
-        const rsi = technicalIndicators.rsi({
-            values: closePrices,
-            period: 14,
-        });
+        const rsi = technicalIndicators.rsi({ values: closePrices, period: 14 });
         const currentRSI = rsi[rsi.length - 1];
-        console.log(`RSI: ${currentRSI}`);
 
-        // Calcular Bandas de Bollinger
-        const bb = technicalIndicators.bollingerbands({
-            values: closePrices,
-            period: 20,
-            stdDev: 2,
-        });
-        const lowerBand = bb[bb.length - 1].lower; // Banda Inferior
-        console.log(`Lower Band: ${lowerBand}`);
+        const bb = technicalIndicators.bollingerbands({ values: closePrices, period: 20, stdDev: 2 });
+        const lowerBand = bb[bb.length - 1].lower;
 
-        // Obter o preço atual
         const ticker = await exchange.fetchTicker(symbol);
         const currentPrice = ticker.last;
-        console.log(`Preço atual: ${currentPrice}`);
 
-        // Verificar se há ordens abertas
         const openOrders = await exchange.fetchOpenOrders(symbol);
         const hasOpenOrders = openOrders.length > 0;
 
-        // Verificar se a última ordem de compra ainda está aberta
-        if (lastBuyOrderId) {
-            const order = await exchange.fetchOrder(lastBuyOrderId, symbol);
-            if (order.status === 'open') {
-                console.log('Ordem de compra ainda está aberta. Não executando nova ordem de compra.');
-                return; // Saia da função se a ordem estiver aberta
-            }
-        }
-
-        // Verificar saldo disponível
         const balance = await exchange.fetchBalance();
-        const availableUSDT = balance.total.USDT; // Acesse o saldo total de USDT
+        const availableUSDT = balance.total.USDT;
 
-        // Verificar condições e executar a ordem de compra
+        // Verifica condições de compra e lança ordem de compra
         if (!hasOpenOrders && currentRSI < 45 && currentPrice <= lowerBand) {
-            const amount = (usdtAmount / currentPrice).toFixed(6); // Cálculo da quantidade de BTC a ser comprada
+            const amount = (usdtAmount / currentPrice).toFixed(6);
 
-            if (availableUSDT < usdtAmount) {
-                console.log('Saldo insuficiente para executar a ordem de compra.');
-                return; // Saia da função se o saldo for insuficiente
-            }
-
-            try {
+            if (availableUSDT >= usdtAmount) {
                 const order = await exchange.createLimitBuyOrder(symbol, amount, currentPrice);
                 console.log('Ordem Limitada de Compra Executada:', order);
-                lastBuyOrderId = order.id; // Armazenar o ID da ordem de compra
+                lastBuyOrderId = order.id;
 
-                // Salvar a ordem de compra no banco de dados
+                // Salva a ordem de compra no banco
                 const buyOrder = new Order({
                     orderId: order.id,
                     symbol: symbol,
@@ -103,28 +88,11 @@ const runBot = async () => {
                 });
                 await buyOrder.save();
 
-                // Calcular o preço de venda (1.2% acima do preço de compra)
-                const sellPrice = (currentPrice * 1.012).toFixed(2);
-                console.log(`Ordem de Venda será lançada a: ${sellPrice}`);
-
-                // Executar a ordem de venda somente se não houver ordens abertas
-                if (!hasOpenOrders) {
-                    const sellOrder = await exchange.createLimitSellOrder(symbol, amount, sellPrice);
-                    console.log('Ordem Limitada de Venda Executada:', sellOrder);
-
-                    // Salvar a ordem de venda no banco de dados
-                    const orderSell = new Order({
-                        orderId: sellOrder.id,
-                        symbol: symbol,
-                        type: 'sell',
-                        price: sellPrice,
-                        amount: amount,
-                        status: 'open',
-                    });
-                    await orderSell.save();
-                }
-            } catch (error) {
-                console.error('Erro ao executar a ordem de compra:', error);
+                // Salva o estado do bot no banco de dados
+                await BotState.updateOne({}, { lastBuyOrderId }, { upsert: true });
+                console.log(`Estado do bot salvo. ID da última ordem de compra: ${lastBuyOrderId}`);
+            } else {
+                console.log('Saldo insuficiente para executar a ordem de compra.');
             }
         } else {
             console.log('Condições não atendidas para compra.');
@@ -134,5 +102,42 @@ const runBot = async () => {
     }
 };
 
-// Configurar o intervalo para monitorar o mercado a cada 5 minutos (300000 ms)
-setInterval(runBot, 100000);
+// Função para monitorar o status da ordem de compra
+async function checkOrderStatus(exchange, symbol) {
+    try {
+        const order = await exchange.fetchOrder(lastBuyOrderId, symbol);
+        if (order.status === 'closed') {
+            console.log('Ordem de compra concluída. Iniciando ordem de venda.');
+
+            const buyPrice = order.price;
+            const amount = order.amount;
+            const sellPrice = (buyPrice * 1.012).toFixed(2);
+
+            const sellOrder = await exchange.createLimitSellOrder(symbol, amount, sellPrice);
+            console.log('Ordem Limitada de Venda Executada:', sellOrder);
+
+            // Salva a ordem de venda no banco
+            const orderSell = new Order({
+                orderId: sellOrder.id,
+                symbol: symbol,
+                type: 'sell',
+                price: sellPrice,
+                amount: amount,
+                status: 'open',
+            });
+            await orderSell.save();
+
+            // Atualiza o banco para limpar o lastBuyOrderId
+            lastBuyOrderId = null;
+            await BotState.updateOne({}, { lastBuyOrderId: null });
+
+        } else {
+            console.log('Ordem de compra ainda não concluída. Continuando monitoramento...');
+        }
+    } catch (error) {
+        console.error('Erro ao verificar status da ordem de compra:', error);
+    }
+}
+//vamos subir
+// Executa o bot a cada 10 segundos
+setInterval(runBot, 10000);
