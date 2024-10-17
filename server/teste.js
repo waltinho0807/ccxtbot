@@ -36,3 +36,24 @@ mongoose.connect('//mongodb+srv://calegari:luizamor4@cluster0.rz7m5.gcp.mongodb.
     mongoose.connection.close();
 })
 .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+
+async function createStrategy() {
+    const newStrategy = new Strategy({
+        name: 'BollingerRSI',
+        indicators: [
+            {
+                name: 'RSI',
+                parameters: { period: 14, threshold: 45 },
+            },
+            {
+                name: 'Bollinger Bands',
+                parameters: { period: 20, stdDev: 2 },
+            },
+        ],
+        buyCondition: 'currentRSI < indicators[0].parameters.threshold && currentPrice <= lowerBand',
+        sellCondition: 'order.status === "closed"',
+    });
+
+    await newStrategy.save();
+    console.log('Estratégia criada:', newStrategy);
+}

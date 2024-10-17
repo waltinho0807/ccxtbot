@@ -1,18 +1,20 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { Order, ApiKey } = require('./models'); // Importar o modelo de ordem
+const { Order, ApiKey, Strategy } = require('./models'); // Importar o modelo de ordem
 const cors = require('cors');
 require('dotenv').config();
 
+
+
 const corsOptions = {
-    origin: process.env.CLIENT_ORIGIN || 'http://localhost:3000', 
-    credentials: true, // access-control-allow-credentials:true
-    optionSuccessStatus: 200
+    origin: '*', //['http://localhost:3000', 'https://ccxtbot.netlify.app'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
 };
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const DATABASE_URL = process.env.DATABASE_URL;
+
 
 app.use(cors(corsOptions));
 app.use(express.json()); // Adiciona o middleware para análise de JSON
@@ -75,7 +77,18 @@ app.get('/api/get-api-key', async (req, res) => {
     }
 });
 
+app.post('/strategies', async (req, res) => {
+    try {
+        const strategy = new Strategy(req.body);
+        await strategy.save();
+        res.status(201).json(strategy);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+
 // Iniciar o servidor
-app.listen(PORT, () => {
+app.listen(PORT || 5000, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });

@@ -40,4 +40,18 @@ const botStateSchema = new mongoose.Schema({
 
 const BotState = mongoose.model('BotState', botStateSchema);
 
-module.exports = { ApiKey, Order, BotState };
+const IndicatorSchema = new mongoose.Schema({
+    name: { type: String, required: true }, // Nome do indicador, e.g., 'RSI', 'Bollinger Bands'
+    parameters: { type: Object, required: true }, // Parâmetros específicos do indicador
+});
+
+const StrategySchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true }, // Nome da estratégia
+    indicators: { type: [IndicatorSchema], required: true }, // Array de indicadores
+    buyCondition: { type: String, required: true }, // Condição de compra em formato de string
+    sellCondition: { type: String, required: true }, // Condição de venda em formato de string
+});
+
+const Strategy = mongoose.model('Strategy', StrategySchema);
+
+module.exports = { ApiKey, Order, BotState, Strategy };
